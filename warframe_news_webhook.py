@@ -114,6 +114,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--post-existing", action="store_true",
                         help="on first run, post current articles instead of just recording them")
+    parser.add_argument("--latest", type=int, metavar="N",
+                        help="post the newest N articles right now, even if already posted")
     args = parser.parse_args()
 
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
@@ -128,12 +130,14 @@ def main():
     first_run = seen is None
     seen = seen or set()
 
-    new = [a for a in articles if a["url"] not in seen]
-    if first_run and not args.post_existing:
-        print(f"First run: recording {len(new)} existing articles without posting.")
+    if args.latest:
+        # Manual mode: newest N (page lists newest first), posted oldest first
+        new = list(reversed(articles[: args.latest]))
+    elif first_run and not args.post_existing:
+        print("First run: recording existing articles without posting.")
         new = []
     else:
-        new.reverse()  # post oldest first so Discord shows them in order
+        new = list(reversed([a for a in articles if a["url"] not in seen]))
 
     for article in new:
         post_to_discord(webhook_url, article)
