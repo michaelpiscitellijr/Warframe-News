@@ -5,6 +5,9 @@ on:
     - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:          # lets you run it by hand from the Actions tab
 
+concurrency:
+  group: warframe-news
+
 permissions:
   contents: write             # needed to save the "already posted" list
 
