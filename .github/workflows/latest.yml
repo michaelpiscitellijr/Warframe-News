@@ -1,0 +1,38 @@
+name: Post latest Warframe news (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "How many of the newest posts to send"
+        default: "3"
+
+concurrency:
+  group: warframe-news   # don't run at the same time as the scheduled job
+
+permissions:
+  contents: write
+
+jobs:
+  post-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Post the latest articles
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python warframe_news_webhook.py --latest ${{ inputs.count }}
+
+      - name: Save the already-posted list
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add seen_warframe.json
+          git diff --cached --quiet || (git commit -m "Update seen articles" && git push)
