@@ -69,15 +69,41 @@ def fetch_articles():
             if s.strip() and not DATE_RE.search(s) and s.strip().lower() != "read more"
             and s.strip() != link.get_text(strip=True)
         ]
-        img = container.find("img", src=True)
         articles.append({
             "title": link.get_text(strip=True),
             "url": url,
             "date": date,
             "summary": " ".join(parts),
-            "image": urljoin(NEWS_URL, img["src"]) if img else None,
+            "image": listing_image(container),
         })
     return articles
+
+
+def listing_image(container):
+    """Look for an image in the news-list card (img tag, lazy-load attrs, or CSS background)."""
+    img = container.find("img")
+    if img:
+        for attr in ("src", "data-src", "data-lazy-src", "data-original"):
+            if img.get(attr) and not img[attr].startswith("data:"):
+                return urljoin(NEWS_URL, img[attr])
+    for el in container.find_all(style=True):
+        m = re.search(r"url\(['\"]?([^'\")]+)", el["style"])
+        if m:
+            return urljoin(NEWS_URL, m.group(1))
+    return None
+
+
+def article_image(url):
+    """Fallback: the article page's og:image (the preview image Discord/Twitter use)."""
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=30)
+        r.raise_for_status()
+        tag = BeautifulSoup(r.text, "html.parser").find("meta", property="og:image")
+        if tag and tag.get("content"):
+            return urljoin(url, tag["content"])
+    except requests.RequestException:
+        pass
+    return None
 
 
 def load_seen():
@@ -91,6 +117,8 @@ def save_seen(urls):
 
 
 def post_to_discord(webhook_url, article):
+    if not article["image"]:
+        article["image"] = article_image(article["url"])
     embed = {
         "title": article["title"][:256],
         "url": article["url"],
